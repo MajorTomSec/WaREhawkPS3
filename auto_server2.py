@@ -74,6 +74,7 @@ def make_packet_t1(paylods, args):
     return packet_header + payload_header + payload
 
 def make_packet_t2(paylods, args):
+    dest_id =
     return None
 
 def extract_payloads(payload):
@@ -98,14 +99,14 @@ def extract_ip_port(from_payload):
     port = struct.unpack("<H", val[8:10])[0]
     return (ip, port)
 
-def make_packet_from_template(template):
+def make_packet_from_template(template, args):
     f = open(template, "r")
     buf = f.read()
     f.close()
 
     template = buf.split("\n")[0].split("#")[0]
-    packet_id, args = template.split(":")
-    packet_args = args.split(",")
+    packet_id, packet_args = template.split(":")
+    args += packet_args.split(",")
 
     make_packet = None
     if packet_id == "T1":
@@ -167,21 +168,21 @@ def make_packet_from_template(template):
         print("# ERROR: INVALID TEMPLATE !")
         return None
 
-    return make_packet(payloads, packet_args)
+    return make_packet(payloads, args)
 
 def send_game_info(payload, addr):
     entries = extract_payloads(payload)
     to_addr = extract_ip_port(entries[0])
     if DEBUG_MODE:
         print("Sending game_info to " + to_addr[0] + ":" + str(to_addr[1]))
-    packet = make_packet_from_template("game_info.wht")
+    packet = make_packet_from_template("game_info.wht", args=[])
     save_data(packet)
     server.sendto(packet, ("<broadcast>", SERVER_PORT))
 
 def send_join_ack(addr):
     if DEBUG_MODE:
         print("Sending join_ack to " + to_addr[0] + ":" + str(to_addr[1]))
-    packet = make_packet_from_template("join_ack.wht")
+    packet = make_packet_from_template("join_ack.wht", args=[addr])
     save_data(packet)
     server.sendto(packet, ("<broadcast>", SERVER_PORT))
 
