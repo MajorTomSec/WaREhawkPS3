@@ -10,6 +10,12 @@ DEBUG_MODE = True
 SERVER_PORT = 10029
 SERVER_ID = 0x1337
 
+special_keys = {
+    "SERVER_ID" : SERVER_ID,
+    "SERVER_PORT" : SERVER_PORT,
+    "CLIENT_IP" : struct.unpack("<L", socket.inet_aton("192.168.0.86"))[0]
+}
+
 PACKET_PREAMBULE = [b'\xC3\x81', b'\xC4\x81']
 TYPE_DISCOVER = 0x19
 TYPE_GAME_INFO = 0x1A
@@ -48,16 +54,17 @@ def handle_payload_t1(payload, addr):
         send_game_info(payload[4:], addr)
 
 def handle_payload_t2(payload, addr):
-    dest_id = struct.unpack(">H", payload[0:2])[0]
+    dest_id = struct.unpack("<H", payload[0:2])[0]
+    src_id = struct.unpack("<H", payload[9:11])[0]
 
     if dest_id == SERVER_ID:
-        send_join_ack(addr)
+        send_join_ack(addr, src_id)
 
-def make_packet_t1(paylods, args):
+def make_packet_t1(payloads, args):
     payload = b''
     n = 1
     type = int(args[0].split(" ")[0], 16)
-    for entry in paylods:
+    for entry in payloads:
         header = b''
         header += bytes([n])
         header += b'\x80'
@@ -73,9 +80,18 @@ def make_packet_t1(paylods, args):
 
     return packet_header + payload_header + payload
 
-def make_packet_t2(paylods, args):
-    dest_id =
-    return None
+def make_packet_t2(payloads, args):
+    print(args)
+    payload = payloads[0]
+    dest_id = args[1]
+
+    payload_header = struct.pack("<H", dest_id)
+    payload_header += struct.pack("<H", 0x1)
+
+    packet_header = PACKET_PREAMBULE[1]
+    packet_header += struct.pack("<H", len(payload_header) + len(payload))
+
+    return packet_header + payload_header + payload
 
 def extract_payloads(payload):
     subs = []
@@ -133,6 +149,8 @@ def make_packet_from_template(template, args):
             data += struct.pack("<H", SERVER_PORT)
         elif "%SERVER_ID%" in line:
             data += struct.pack("<H", SERVER_ID)
+        elif "%" in line:
+            data += struct.pack("<L", special_keys.get(line.split("%")[1]))
         else:
             padding = 4
             is_str = False
@@ -179,10 +197,10 @@ def send_game_info(payload, addr):
     save_data(packet)
     server.sendto(packet, ("<broadcast>", SERVER_PORT))
 
-def send_join_ack(addr):
+def send_join_ack(addr, dst_id):
     if DEBUG_MODE:
-        print("Sending join_ack to " + to_addr[0] + ":" + str(to_addr[1]))
-    packet = make_packet_from_template("join_ack.wht", args=[addr])
+        print("Sending join_ack to " + addr[0] + ":" + str(addr[1]))
+    packet = make_packet_from_template("join_ack.wht", args=[addr, dst_id])
     save_data(packet)
     server.sendto(packet, ("<broadcast>", SERVER_PORT))
 
@@ -210,7 +228,7 @@ while True:
         if addr[0] == LOCAL_IP:
             continue
         if DEBUG_MODE:
-            print("Received packet from " + str(addr))
+            #print("Received packet from " + str(addr))
             save_data(data)
         handle_packet(data, addr)
 

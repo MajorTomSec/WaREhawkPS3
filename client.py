@@ -37,7 +37,7 @@ while True:
     data, addr = client.recvfrom(1024)
     print("received message from : " + str(addr))
     save_data(data)
-    f = open("exchange/client" + str(n)  + ".bin", "rb")
+    f = open("client/client" + str(n)  + ".bin", "rb")
     data = f.read()
     f.close()
     client.sendto(data, ('<broadcast>', UDP_PORT))
