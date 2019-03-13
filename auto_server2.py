@@ -29,16 +29,29 @@ def save_data(data):
     f.write(data)
     f.close()
 
-def handle_payload(payload):
+def handle_packet(data, addr):
+    sz = struct.unpack("<H", data[2:4])[0]
+    payload = data[4:]
+    if (len(payload) != sz):
+        print("# WARNING: INCOMPLETE PAYLOAD")
+    if data[0:2] == PACKET_PREAMBULE[0]:
+        handle_payload_t1(payload, addr)
+    else:
+        handle_payload_t2(payload, addr)
+
+def handle_payload_t1(payload, addr):
     sz = struct.unpack(">H", payload[2:4])[0]
     type = payload[1]
     if len(payload[2:]) != sz:
         print("# WARNING: UNMATCHING PAYLOAD SIZE")
-        # return
     if type == TYPE_DISCOVER:
-        send_game_info(payload[4:])
-    elif type == TYPE_GAME_INFO:
-        pass
+        send_game_info(payload[4:], addr)
+
+def handle_payload_t2(payload, addr):
+    dest_id = struct.unpack(">H", payload[0:2])[0]
+
+    if dest_id == SERVER_ID:
+        send_join_ack(addr)
 
 def make_packet_t1(paylods, args):
     payload = b''
@@ -156,12 +169,19 @@ def make_packet_from_template(template):
 
     return make_packet(payloads, packet_args)
 
-def send_game_info(payload):
+def send_game_info(payload, addr):
     entries = extract_payloads(payload)
     to_addr = extract_ip_port(entries[0])
     if DEBUG_MODE:
         print("Sending game_info to " + to_addr[0] + ":" + str(to_addr[1]))
     packet = make_packet_from_template("game_info.wht")
+    save_data(packet)
+    server.sendto(packet, ("<broadcast>", SERVER_PORT))
+
+def send_join_ack(addr):
+    if DEBUG_MODE:
+        print("Sending join_ack to " + to_addr[0] + ":" + str(to_addr[1]))
+    packet = make_packet_from_template("join_ack.wht")
     save_data(packet)
     server.sendto(packet, ("<broadcast>", SERVER_PORT))
 
@@ -191,10 +211,6 @@ while True:
         if DEBUG_MODE:
             print("Received packet from " + str(addr))
             save_data(data)
-        sz = struct.unpack("<H", data[2:4])[0]
-        payload = data[4:]
-        if (len(payload) != sz):
-            print("# WARNING: INCOMPLETE PAYLOAD")
-        handle_payload(payload)
+        handle_packet(data, addr)
 
 server.close()
