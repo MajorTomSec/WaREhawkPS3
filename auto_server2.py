@@ -149,8 +149,6 @@ def make_packet_from_template(template, args):
             data += struct.pack("<H", SERVER_PORT)
         elif "%SERVER_ID%" in line:
             data += struct.pack("<H", SERVER_ID)
-        elif "%" in line:
-            data += struct.pack("<L", special_keys.get(line.split("%")[1]))
         else:
             padding = 4
             is_str = False
@@ -160,6 +158,8 @@ def make_packet_from_template(template, args):
             if line.startswith('"'):
                 d = bytes(line.split('"')[1], 'utf-8')
                 is_str = True
+            elif "%" in line:
+                d = special_keys.get(line.split("%")[1])
             else:
                 line = line.split(" ")[0]
                 if line.startswith("0x"):
