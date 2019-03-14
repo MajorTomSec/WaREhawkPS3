@@ -20,6 +20,20 @@ def save_data(data):
 
 atexit.register(terminate)
 
+
+def get_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+    except:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
+LOCAL_IP = get_ip()
+
 f = open("exchange/discover.bin", "rb")
 data = f.read()
 f.close()
@@ -35,6 +49,8 @@ client.sendto(data, ('<broadcast>', UDP_PORT))
 n=1
 while True:
     data, addr = client.recvfrom(1024)
+    if addr[0] == LOCAL_IP:
+        continue
     print("received message from : " + str(addr))
     save_data(data)
     f = open("client/client" + str(n)  + ".bin", "rb")
