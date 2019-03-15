@@ -71,12 +71,13 @@ def handle_payload_t2(payload, addr):
             pass # we don't care about client's identity
 
 def handle_packet_short(data, addr):
-    unk1,unk2 = struct.unpack("<H", data[0:2])[0], struct.unpack("<H", data[4:6])[0]
+    head, unk = struct.unpack("<H", data[0:2])[0], struct.unpack("<H", data[4:6])[0]
+    type = data[3]
     payload = data[4:]
-    if struct.unpack("<H", payload[8:10])[0] == SERVER_ID:
-        print("\tpacket id: " + hex(unk1) + " " + hex(unk2))
-        pass
-
+    dst_id = struct.unpack("<H", payload[8:10])[0]
+    if dst_id == SERVER_ID:
+        if type == 0x50:
+            send_unk1_short(data, addr)
 
 def make_packet_t1(payloads, args):
     payload = b''
@@ -110,6 +111,9 @@ def make_packet_t2(payloads, args):
     packet_header += struct.pack("<H", len(payload_header) + len(payload))
 
     return packet_header + payload_header + payload
+
+def make_packet_short(payloads, args):
+    return None
 
 def extract_payloads(payload):
     subs = []
@@ -145,8 +149,10 @@ def make_packet_from_template(template, args):
     make_packet = None
     if packet_id == "T1":
         make_packet = make_packet_t1
-    else:
+    elif packet_id == "T2":
         make_packet = make_packet_t2
+    elif packet_id == "S0":
+        make_packet = make_packet_short
 
     payloads = []
     data = b''
@@ -223,7 +229,16 @@ def send_machine_auth_confirm(addr, dst_id, is_resp):
     packet = make_packet_from_template("auth_confirm.wht", args)
     send_packet(packet, addr)
 
-
+def send_unk1_short(packet, addr):
+    resp = packet[0:4]
+    resp += struct.pack("<H", 0x1234) # Anything
+    resp += struct.pack("<H", 0x0)
+    resp += packet[8:12]
+    resp += struct.pack("<H", SERVER_ID)
+    resp += b'\x5E'
+    resp += packet[15:18]
+    send_packet(resp, addr)
+    
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
