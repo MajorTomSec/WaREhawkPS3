@@ -16,7 +16,7 @@ special_keys = {
     "CLIENT_IP" : struct.unpack("<L", socket.inet_aton("192.168.0.86"))[0]
 }
 
-PACKET_PREAMBULE = [b'\xC3\x81', b'\xC4\x81', b'\xe1\x8a']
+PACKET_PREAMBULE = [b'\xC3\x81', b'\xC4\x81']
 TYPE_DISCOVER = 0x19
 TYPE_GAME_INFO = 0x1A
 
@@ -37,16 +37,18 @@ def save_data(data, prefix="client"):
 
 def handle_packet(data, addr):
     sz = struct.unpack("<H", data[2:4])[0]
+    sz_ = data[2]
     payload = data[4:]
-    if (len(payload) != sz):
+    if (len(payload) != sz and len(payload) - 2 != sz_):
         print("# WARNING: INCOMPLETE PAYLOAD")
 
-    if data[0:2] == PACKET_PREAMBULE[0]:
-        handle_payload_t1(payload, addr)
-    elif data[0:2] == PACKET_PREAMBULE[1]:
-        handle_payload_t2(payload, addr)
-    elif data[0:2] == PACKET_PREAMBULE[2]:
-        handle_payload_t3(payload, addr)
+    if (data[0:2] in PACKET_PREAMBULE):
+        if data[0:2] == PACKET_PREAMBULE[0]:
+            handle_payload_t1(payload, addr)
+        elif data[0:2] == PACKET_PREAMBULE[1]:
+            handle_payload_t2(payload, addr)
+    else:
+        handle_packet_short(data, addr)
 
 def handle_payload_t1(payload, addr):
     sz = struct.unpack(">H", payload[2:4])[0]
@@ -68,8 +70,13 @@ def handle_payload_t2(payload, addr):
         else:
             pass # we don't care about client's identity
 
-def handle_payload_t3(payload, addr):
-    pass
+def handle_packet_short(data, addr):
+    unk1,unk2 = struct.unpack("<H", data[0:2])[0], struct.unpack("<H", data[4:6])[0]
+    payload = data[4:]
+    if struct.unpack("<H", payload[8:10])[0] == SERVER_ID:
+        print("\tpacket id: " + hex(unk1) + " " + hex(unk2))
+        pass
+
 
 def make_packet_t1(payloads, args):
     payload = b''
@@ -237,12 +244,11 @@ print("Started server on " + LOCAL_IP + ":" + str(SERVER_PORT))
 
 while True:
     data, addr = server.recvfrom(1024)
-    if (data[0:2] in PACKET_PREAMBULE):
-        if addr[0] == LOCAL_IP:
-            continue
-        if DEBUG_MODE:
-            print("Received packet from " + str(addr))
-            save_data(data)
-        handle_packet(data, addr)
+    if addr[0] == LOCAL_IP:
+        continue
+    if DEBUG_MODE:
+        print("Received packet from " + str(addr))
+        save_data(data)
+    handle_packet(data, addr)
 
 server.close()
