@@ -16,7 +16,7 @@ special_keys = {
     "CLIENT_IP" : struct.unpack("<L", socket.inet_aton("192.168.0.86"))[0]
 }
 
-PACKET_PREAMBULE = [b'\xC3\x81', b'\xC4\x81']
+PACKET_PREAMBULE = [b'\xC3\x81', b'\xC4\x81', b'\xe1\x8a']
 TYPE_DISCOVER = 0x19
 TYPE_GAME_INFO = 0x1A
 
@@ -27,11 +27,11 @@ atexit.register(terminate)
 def pad(data, size):
     return data + (b'\x00' * (size - len(data)))
 
-def save_data(data):
+def save_data(data, prefix="client"):
     i = 0
-    while os.path.exists("debug/debug" + str(i) + ".bin"):
+    while os.path.exists("debug/" + prefix + str(i) + ".bin"):
         i += 1
-    f = open("debug/debug" + str(i) + ".bin", "wb+")
+    f = open("debug/" + prefix + str(i) + ".bin", "wb+")
     f.write(data)
     f.close()
 
@@ -40,10 +40,13 @@ def handle_packet(data, addr):
     payload = data[4:]
     if (len(payload) != sz):
         print("# WARNING: INCOMPLETE PAYLOAD")
+
     if data[0:2] == PACKET_PREAMBULE[0]:
         handle_payload_t1(payload, addr)
-    else:
+    elif data[0:2] == PACKET_PREAMBULE[1]:
         handle_payload_t2(payload, addr)
+    elif data[0:2] == PACKET_PREAMBULE[2]:
+        handle_payload_t3(payload, addr)
 
 def handle_payload_t1(payload, addr):
     sz = struct.unpack(">H", payload[2:4])[0]
@@ -56,9 +59,17 @@ def handle_payload_t1(payload, addr):
 def handle_payload_t2(payload, addr):
     dest_id = struct.unpack("<H", payload[0:2])[0]
     src_id = struct.unpack("<H", payload[9:11])[0]
+    is_resp = (struct.unpack("<H", payload[2:4])[0] == 0x1)
 
     if dest_id == SERVER_ID:
-        send_join_ack(addr, src_id)
+        if not is_resp: # client is requesting for id confirmation
+            send_machine_auth_confirm(addr, src_id, is_resp=True)
+            send_machine_auth_confirm(addr, src_id, is_resp=False) # send back auth request
+        else:
+            pass # we don't care about client's identity
+
+def handle_payload_t3(payload, addr):
+    pass
 
 def make_packet_t1(payloads, args):
     payload = b''
@@ -81,12 +92,12 @@ def make_packet_t1(payloads, args):
     return packet_header + payload_header + payload
 
 def make_packet_t2(payloads, args):
-    print(args)
     payload = payloads[0]
     dest_id = args[1]
+    is_resp = args[2]
 
     payload_header = struct.pack("<H", dest_id)
-    payload_header += struct.pack("<H", 0x1)
+    payload_header += struct.pack("<H", (0x1 if is_resp else 0x0))
 
     packet_header = PACKET_PREAMBULE[1]
     packet_header += struct.pack("<H", len(payload_header) + len(payload))
@@ -188,21 +199,23 @@ def make_packet_from_template(template, args):
 
     return make_packet(payloads, args)
 
-def send_game_info(payload, addr):
-    entries = extract_payloads(payload)
-    to_addr = extract_ip_port(entries[0])
+def send_packet(packet, addr):
     if DEBUG_MODE:
-        print("Sending game_info to " + to_addr[0] + ":" + str(to_addr[1]))
-    packet = make_packet_from_template("game_info.wht", args=[])
-    save_data(packet)
-    server.sendto(packet, ("<broadcast>", SERVER_PORT))
+        print("Sending packet to " + addr[0] + ":" + str(addr[1]))
+    save_data(packet, prefix="server")
+    server.sendto(packet, addr)
 
-def send_join_ack(addr, dst_id):
-    if DEBUG_MODE:
-        print("Sending join_ack to " + addr[0] + ":" + str(addr[1]))
-    packet = make_packet_from_template("join_ack.wht", args=[addr, dst_id])
-    save_data(packet)
-    server.sendto(packet, ("<broadcast>", SERVER_PORT))
+def send_game_info(payload, addr):
+    #entries = extract_payloads(payload)
+    args = []
+    packet = make_packet_from_template("game_info.wht", args)
+    send_packet(packet, addr)
+
+def send_machine_auth_confirm(addr, dst_id, is_resp):
+    args = [addr, dst_id, is_resp]
+    packet = make_packet_from_template("auth_confirm.wht", args)
+    send_packet(packet, addr)
+
 
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -228,7 +241,7 @@ while True:
         if addr[0] == LOCAL_IP:
             continue
         if DEBUG_MODE:
-            #print("Received packet from " + str(addr))
+            print("Received packet from " + str(addr))
             save_data(data)
         handle_packet(data, addr)
 
