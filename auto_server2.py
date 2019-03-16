@@ -71,13 +71,15 @@ def handle_payload_t2(payload, addr):
             pass # we don't care about client's identity
 
 def handle_packet_short(data, addr):
-    head, unk = struct.unpack("<H", data[0:2])[0], struct.unpack("<H", data[4:6])[0]
+    head, unk = data[0:2], struct.unpack("<H", data[4:6])[0]
     type = data[3]
-    payload = data[4:]
-    dst_id = struct.unpack("<H", payload[8:10])[0]
-    if dst_id == SERVER_ID:
-        if type == 0x50:
-            send_unk1_short(data, addr)
+    #payload = data[4:]
+    #dst_id = struct.unpack("<H", payload[8:10])[0]
+    #if dst_id == SERVER_ID:
+    if type == 0x50:
+        send_unk1_short(data, addr)
+    else:
+        send_short_empty(head, addr)
 
 def make_packet_t1(payloads, args):
     payload = b''
@@ -238,7 +240,11 @@ def send_unk1_short(packet, addr):
     resp += b'\x5E'
     resp += packet[15:18]
     send_packet(resp, addr)
-    
+
+def send_short_empty(head, addr):
+    data = head + struct.pack("<L", 0x0)
+    send_packet(data, addr)
+
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
