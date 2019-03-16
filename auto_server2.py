@@ -238,7 +238,7 @@ def send_unk1_short(packet, addr):
     resp += struct.pack("<H", 0x0)
     resp += packet[8:12]
     resp += struct.pack("<H", SERVER_ID)
-    resp += struct.pack("<H", random.getrandbits(8)) # Anything
+    resp += struct.pack("B", random.getrandbits(8)) # Anything
     resp += packet[15:18]
     send_packet(resp, addr)
 

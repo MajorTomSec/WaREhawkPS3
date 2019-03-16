@@ -40,7 +40,7 @@ T1:0x1A # Template 1
 0:1 # Friendly fire (%)
 6:1 # Start delay
 5:1 # Spawn delay
-0x:2 # Flags (LSB -> MSB => 0: randomise teams, 1: split screen, 2: team switch, 3: ??, 4: balance, 5: voice, 6: ranked, 7: dedicated, 8: ??, 9: official/text color, 10: ??, 11: ??, 12: ??, 13: ??, 14: ??, 15: password)
+0x4cb6:2 # Flags (LSB -> MSB => 0: randomise teams, 1: split screen, 2: team switch, 3: ??, 4: balance, 5: voice, 6: ranked, 7: dedicated, 8: ??, 9: official/text color, 10: ??, 11: ??, 12: ??, 13: ??, 14: ??, 15: password)
 0:1
 6:1
 "":20
