@@ -3,6 +3,7 @@ import binascii
 import atexit
 import time
 import struct
+import random
 import os.path
 
 DEBUG_MODE = True
@@ -233,11 +234,11 @@ def send_machine_auth_confirm(addr, dst_id, is_resp):
 
 def send_unk1_short(packet, addr):
     resp = packet[0:4]
-    resp += struct.pack("<H", 0x1234) # Anything
+    resp += struct.pack("<H", random.getrandbits(16)) # Anything
     resp += struct.pack("<H", 0x0)
     resp += packet[8:12]
     resp += struct.pack("<H", SERVER_ID)
-    resp += b'\x5E'
+    resp += struct.pack("<H", random.getrandbits(8)) # Anything
     resp += packet[15:18]
     send_packet(resp, addr)
 
